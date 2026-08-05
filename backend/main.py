@@ -57,3 +57,12 @@ def firestore_get(collection: str, doc_id: str):
 @app.get("/firestore/list/{collection}")
 def firestore_list(collection: str, limit: int = 50):
     return list_documents(collection, limit)
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "Backend API is running",
+        "health": "/health",
+        "docs": "/docs"
+    }
