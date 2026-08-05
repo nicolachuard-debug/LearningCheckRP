@@ -12,7 +12,7 @@ def _ensure_configured():
         _configured = True
 
 
-def generate_text(prompt: str, model_name: str = "gemini-1.5-flash-latest") -> str:
+def generate_text(prompt: str, model_name: str = "gemini-1.5") -> str:
     _ensure_configured()
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
