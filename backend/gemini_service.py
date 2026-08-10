@@ -3,6 +3,7 @@ from google.genai import types
 from config import GEMINI_API_KEY
 
 _client = None
+DEFAULT_MODEL = "gemini-3-flash"  # fallback: "gemini-3.1-flash-lite"
 
 
 def _get_client():
@@ -14,7 +15,7 @@ def _get_client():
     return _client
 
 
-def generate_text(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+def generate_text(prompt: str, model_name: str = DEFAULT_MODEL) -> str:
     client = _get_client()
     response = client.models.generate_content(
         model=model_name,
@@ -23,7 +24,7 @@ def generate_text(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
     return response.text
 
 
-def generate_from_image(prompt: str, image_bytes: bytes, mime_type: str = "image/jpeg", model: str = "gemini-2.5-flash") -> str:
+def generate_from_image(prompt: str, image_bytes: bytes, mime_type: str = "image/jpeg", model: str = DEFAULT_MODEL) -> str:
     client = _get_client()
     response = client.models.generate_content(
         model=model,
