@@ -19,7 +19,9 @@ def _get_client():
         kwargs["temperature"] = temperature
     if max_output_tokens is not None:
         kwargs["max_output_tokens"] = max_output_tokens
-    return types.GenerateContentConfig(**kwargs)def _extract_text(response) -> str:
+    return types.GenerateContentConfig(**kwargs)
+    
+def _extract_text(response) -> str:
     if not getattr(response, "candidates", None):
         raise RuntimeError("Risposta vuota da Gemini: nessun candidato restituito (possibile blocco safety).")
         candidate = response.candidates[0]
