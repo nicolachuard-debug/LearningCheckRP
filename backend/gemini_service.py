@@ -3,7 +3,9 @@ import mimetypes
 from typing import Optionalfrom google import genai
 from google.genai import typesfrom config import GEMINI_API_KEYlogger = logging.getLogger(name)_client = NoneDEFAULT_MODEL = "gemini-2.5-flash"
 DEFAULT_MIME_TYPE = "image/jpeg"
-DEFAULT_MAX_IMAGE_SIZE_MB = 20def _get_client():
+DEFAULT_MAX_IMAGE_SIZE_MB = 20
+
+def _get_client():
     global _client
     if _client is None:
         if not GEMINI_API_KEY:
