@@ -1,28 +1,35 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from config import GEMINI_API_KEY
 
-_configured = False
+_client = None
 
-def _ensure_configured():
-    global _configured
-    if not _configured:
+
+def _get_client():
+    global _client
+    if _client is None:
         if not GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY non impostata: impossibile usare Gemini.")
-        genai.configure(api_key=GEMINI_API_KEY)
-        _configured = True
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
-def generate_text(prompt: str, model_name: str = "gemini-1.5") -> str:
-    _ensure_configured()
-    model = genai.GenerativeModel(model_name)
-    response = model.generate_content(prompt)
+def generate_text(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+    client = _get_client()
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt
+    )
     return response.text
 
 
-def generate_from_image(prompt: str, image_bytes: bytes, mime_type: str = "image/jpeg", model: str = "gemini-1.5-flash") -> str:
-    gemini_model = genai.GenerativeModel(model)
-    response = gemini_model.generate_content([
-        prompt,
-        {"mime_type": mime_type, "data": image_bytes}
-    ])
+def generate_from_image(prompt: str, image_bytes: bytes, mime_type: str = "image/jpeg", model: str = "gemini-2.5-flash") -> str:
+    client = _get_client()
+    response = client.models.generate_content(
+        model=model,
+        contents=[
+            prompt,
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+        ]
+    )
     return response.text
