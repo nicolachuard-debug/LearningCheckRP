@@ -35,7 +35,7 @@ def gemini_generate(req: GeminiRequest):
 
 class DocumentIn(BaseModel):
     collection: str
-    dict
+    data: dict
     doc_id: Optional[str] = None
 
 
