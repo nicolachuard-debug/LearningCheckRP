@@ -4,12 +4,12 @@ from typing import Optional
 import json
 import re
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from gemini_service import generate_text, generate_from_image
 from firestore_service import save_document, get_document, list_documents
 
 app = FastAPI(title="Backend API")
-
-from fastapi.middleware.cors import CORSMiddleware
 
 ALLOWED_ORIGINS = [
     "http://localhost:5173",       # Vite dev server
@@ -145,9 +145,14 @@ async def analyze(file: UploadFile = File(...), model: Optional[str] = Form("gem
     try:
         image_bytes = await file.read()
         mime_type = file.content_type or "image/jpeg"
-
-        raw_result = generate_from_image(ANALYZE_PROMPT, image_bytes, mime_type, model)
-
+        
+        raw_result = generate_from_image(
+            ANALYZE_PROMPT,
+            image_bytes,
+            mime_type=mime_type,
+            model=model,
+        )
+        
         # L'immagine non serve più: la scartiamo subito, non viene mai scritta su disco/storage
         del image_bytes
 
