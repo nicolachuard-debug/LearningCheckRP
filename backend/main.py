@@ -6,6 +6,9 @@ import re
 
 from gemini_service import generate_text, generate_from_image
 from firestore_service import save_document, get_document, list_documents
+
+app = FastAPI(title="Backend API")
+
 from fastapi.middleware.cors import CORSMiddleware
 
 ALLOWED_ORIGINS = [
@@ -22,9 +25,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app = FastAPI(title="Backend API")
-
 
 @app.get("/health")
 def health():
