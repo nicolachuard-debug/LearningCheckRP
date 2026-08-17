@@ -33,7 +33,7 @@ def health():
 
 class GeminiRequest(BaseModel):
     prompt: str
-    model: Optional[str] = "gemini-1.5-flash"
+    model: Optional[str] = "gemini-2.5-flash"
 
 
 class GeminiResponse(BaseModel):
