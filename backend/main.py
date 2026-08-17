@@ -6,6 +6,22 @@ import re
 
 from gemini_service import generate_text, generate_from_image
 from firestore_service import save_document, get_document, list_documents
+from fastapi.middleware.cors import CORSMiddleware
+
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",       # Vite dev server
+    "http://127.0.0.1:5173",
+    # "https://<tuo-progetto>.web.app",       # <-- sostituisci con il tuo dominio Firebase Hosting
+    # "https://<tuo-progetto>.firebaseapp.com",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app = FastAPI(title="Backend API")
 
