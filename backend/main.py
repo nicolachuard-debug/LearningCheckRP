@@ -26,6 +26,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Tipi di file accettati per /analyze (immagini + PDF)
+ALLOWED_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+}
+
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -51,7 +64,7 @@ def gemini_generate(req: GeminiRequest):
 
 class DocumentIn(BaseModel):
     collection: str
-    data: dict
+    dict
     doc_id: Optional[str] = None
 
 
@@ -138,35 +151,45 @@ Restituisci ESCLUSIVAMENTE un JSON valido con questa struttura:
 
 Non aggiungere altro testo oltre al JSON.
 """
-# Tipi di file accettati per /analyze
-ALLOWED_MIME_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-    "application/pdf",
-}
+
 
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...), model: Optional[str] = Form("gemini-1.5-flash")):
     try:
-        image_bytes = await file.read()
-        mime_type = file.content_type or "image/jpeg"
-        
+        mime_type = file.content_type or ""
+
+        if mime_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Tipo file non supportato: {mime_type}. "
+                    f"Accettati: immagini (jpeg, png, webp, heic/heif) o PDF."
+                ),
+            )
+
+        file_bytes = await file.read()
+
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="File vuoto.")
+
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File troppo grande (max 20MB).")
+
         raw_result = generate_from_image(
             ANALYZE_PROMPT,
-            image_bytes,
+            file_bytes,
             mime_type=mime_type,
             model=model,
         )
-        
-        # L'immagine non serve più: la scartiamo subito, non viene mai scritta su disco/storage
-        del image_bytes
+
+        # Il file non serve più: lo scartiamo subito, non viene mai scritto su disco/storage
+        del file_bytes
 
         parsed = _extract_json(raw_result)
         return parsed
 
+    except HTTPException:
+        raise
     except json.JSONDecodeError:
         raise HTTPException(status_code=502, detail="Risposta del modello non in formato JSON valido")
     except Exception as e:
@@ -188,20 +211,4 @@ def evaluate(req: EvaluateRequest):
             correct_answer=req.correctAnswer,
             user_answer=req.userAnswer,
         )
-        raw_result = generate_text(prompt, req.model)
-        parsed = _extract_json(raw_result)
-        return parsed
-
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=502, detail="Risposta del modello non in formato JSON valido")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/")
-def root():
-    return {
-        "message": "Backend API is running",
-        "health": "/health",
-        "docs": "/docs"
-    }
+        raw_result = generate_text(prompt,
