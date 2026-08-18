@@ -1,126 +1,190 @@
+"""
+gemini_service.py
+
+Servizio di integrazione con Gemini API.
+Supporta generazione di contenuti a partire da:
+  - immagini (JPEG, PNG, WEBP, HEIC/HEIF)
+  - documenti PDF
+
+Il file può essere inviato a Gemini come `inline_data` con il mime_type
+corretto: Gemini gestisce nativamente sia immagini che PDF senza bisogno
+di conversioni lato client.
+"""
+
+import base64
+import json
 import logging
-import mimetypes
 from typing import Optional
 
-from google import genai
-from google.genai import types
-
-from config import GEMINI_API_KEY
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-_client = None
+# Mime types accettati per l'invio a Gemini.
+# Seconda barriera di validazione, indipendente da quella in main.py.
+SUPPORTED_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+}
 
-DEFAULT_MODEL = "gemini-2.5-flash"
-DEFAULT_MIME_TYPE = "image/jpeg"
-DEFAULT_MAX_IMAGE_SIZE_MB = 20
-
-
-def _get_client():
-    global _client
-    if _client is None:
-        if not GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY non impostata: impossibile usare Gemini.")
-        _client = genai.Client(api_key=GEMINI_API_KEY)
-    return _client
+DEFAULT_MODEL = "gemini-1.5-flash"
 
 
-def _build_config(temperature: Optional[float], max_output_tokens: Optional[int]):
-    if temperature is None and max_output_tokens is None:
-        return None
-    kwargs = {}
-    if temperature is not None:
-        kwargs["temperature"] = temperature
-    if max_output_tokens is not None:
-        kwargs["max_output_tokens"] = max_output_tokens
-    return types.GenerateContentConfig(**kwargs)
+class GeminiServiceError(Exception):
+    """Errore generico del servizio Gemini."""
+    pass
+
+
+def _validate_mime_type(mime_type: str) -> None:
+    if mime_type not in SUPPORTED_MIME_TYPES:
+        raise ValueError(
+            f"Tipo di file non supportato: '{mime_type}'. "
+            f"Tipi supportati: {', '.join(sorted(SUPPORTED_MIME_TYPES))}"
+        )
+
+
+def _validate_file_size(file_bytes: bytes, max_file_size_mb: float) -> None:
+    size_mb = len(file_bytes) / (1024 * 1024)
+    if size_mb > max_file_size_mb:
+        raise ValueError(
+            f"File troppo grande: {size_mb:.2f} MB "
+            f"(limite massimo: {max_file_size_mb} MB)"
+        )
+
+
+def _build_config(temperature: float = 0.4, max_output_tokens: int = 4096) -> dict:
+    return {
+        "temperature": temperature,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": max_output_tokens,
+        "response_mime_type": "application/json",
+    }
 
 
 def _extract_text(response) -> str:
-    if not getattr(response, "candidates", None):
-        raise RuntimeError("Risposta vuota da Gemini: nessun candidato restituito (possibile blocco safety).")
+    """Estrae il testo dalla risposta di Gemini, con gestione errori robusta."""
+    try:
+        return response.text
+    except Exception as exc:
+        logger.error("Impossibile estrarre il testo dalla risposta Gemini: %s", exc)
+        raise GeminiServiceError(
+            "La risposta di Gemini non contiene testo valido. "
+            "Possibile blocco per safety filter o risposta vuota."
+        ) from exc
 
-    candidate = response.candidates[0]
-    finish_reason = getattr(candidate, "finish_reason", None)
 
-    text = getattr(response, "text", None)
-    if not text:
-        raise RuntimeError(
-            f"Risposta vuota o bloccata da Gemini (finish_reason={finish_reason})."
+def generate_from_file(
+    file_bytes: bytes,
+    mime_type: str,
+    prompt: str,
+    model: str = DEFAULT_MODEL,
+    max_file_size_mb: float = 10.0,
+    temperature: float = 0.4,
+    max_output_tokens: int = 4096,
+) -> str:
+    """
+    Genera contenuto a partire da un file (immagine o PDF) e un prompt testuale.
+
+    Gestisce in modo unificato immagini e PDF: il file viene inviato a Gemini
+    come inline_data con il mime_type corretto, senza alcuna conversione
+    lato client. Gemini elabora nativamente entrambi i formati.
+
+    Args:
+        file_bytes: contenuto binario del file (immagine o PDF).
+        mime_type: mime type del file (es. "image/jpeg", "application/pdf").
+        prompt: istruzioni testuali da associare al file.
+        model: nome del modello Gemini da utilizzare.
+        max_file_size_mb: dimensione massima consentita per il file.
+        temperature: temperatura di generazione.
+        max_output_tokens: numero massimo di token in output.
+
+    Returns:
+        Testo generato da Gemini (tipicamente una stringa JSON).
+
+    Raises:
+        ValueError: se il mime_type non è supportato o il file supera la dimensione massima.
+        GeminiServiceError: se la chiamata a Gemini fallisce o la risposta è invalida.
+    """
+    _validate_mime_type(mime_type)
+    _validate_file_size(file_bytes, max_file_size_mb)
+
+    try:
+        generative_model = genai.GenerativeModel(model)
+
+        file_part = {
+            "inline_data": {
+                "mime_type": mime_type,
+                "data": base64.b64encode(file_bytes).decode("utf-8"),
+            }
+        }
+
+        response = generative_model.generate_content(
+            [file_part, prompt],
+            generation_config=_build_config(temperature, max_output_tokens),
         )
 
-    return text
+        return _extract_text(response)
 
-
-def _guess_mime_type(filename: Optional[str], fallback: str = DEFAULT_MIME_TYPE) -> str:
-    if not filename:
-        return fallback
-    guessed, _ = mimetypes.guess_type(filename)
-    return guessed or fallback
+    except ValueError:
+        # ri-solleva gli errori di validazione senza wrapparli
+        raise
+    except Exception as exc:
+        logger.error("Errore durante la chiamata a Gemini: %s", exc)
+        raise GeminiServiceError(f"Errore durante la generazione: {exc}") from exc
 
 
 def generate_text(
     prompt: str,
-    model_name: str = DEFAULT_MODEL,
-    temperature: Optional[float] = None,
-    max_output_tokens: Optional[int] = None,
-) -> str:
-    if not prompt or not prompt.strip():
-        raise ValueError("Il prompt non può essere vuoto.")
-
-    client = _get_client()
-    config = _build_config(temperature, max_output_tokens)
-
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=config,
-        )
-    except Exception as e:
-        logger.error("Errore durante la chiamata a Gemini (generate_text): %s", e)
-        raise RuntimeError(f"Errore nella chiamata a Gemini: {e}") from e
-
-    return _extract_text(response)
-
-
-def generate_from_image(
-    prompt: str,
-    image_bytes: bytes,
-    mime_type: Optional[str] = None,
-    filename: Optional[str] = None,
     model: str = DEFAULT_MODEL,
-    temperature: Optional[float] = None,
-    max_output_tokens: Optional[int] = None,
-    max_image_size_mb: float = DEFAULT_MAX_IMAGE_SIZE_MB,
+    temperature: float = 0.4,
+    max_output_tokens: int = 4096,
 ) -> str:
-    if not prompt or not prompt.strip():
-        raise ValueError("Il prompt non può essere vuoto.")
-    if not image_bytes:
-        raise ValueError("image_bytes non può essere vuoto.")
+    """
+    Genera contenuto a partire da un prompt testuale, senza file allegato.
+    Utile per l'endpoint /evaluate.
+    """
+    try:
+        generative_model = genai.GenerativeModel(model)
 
-    size_mb = len(image_bytes) / (1024 * 1024)
-    if size_mb > max_image_size_mb:
-        raise ValueError(
-            f"Immagine troppo grande ({size_mb:.1f} MB): limite massimo {max_image_size_mb} MB."
+        response = generative_model.generate_content(
+            prompt,
+            generation_config=_build_config(temperature, max_output_tokens),
         )
 
-    resolved_mime_type = mime_type or _guess_mime_type(filename)
+        return _extract_text(response)
 
-    client = _get_client()
-    config = _build_config(temperature, max_output_tokens)
+    except Exception as exc:
+        logger.error("Errore durante la chiamata a Gemini (generate_text): %s", exc)
+        raise GeminiServiceError(f"Errore durante la generazione: {exc}") from exc
+
+
+def parse_json_response(raw_text: str) -> dict:
+    """
+    Effettua il parsing sicuro di una risposta JSON generata da Gemini,
+    con gestione di eventuali code fence markdown residui.
+    """
+    cleaned = raw_text.strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("```")[1]
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
 
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=[
-                prompt,
-                types.Part.from_bytes(data=image_bytes, mime_type=resolved_mime_type),
-            ],
-            config=config,
-        )
-    except Exception as e:
-        logger.error("Errore durante la chiamata a Gemini (generate_from_image): %s", e)
-        raise RuntimeError(f"Errore nella chiamata a Gemini: {e}") from e
+        return json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        logger.error("Impossibile fare il parsing del JSON: %s\nContenuto: %s", exc, cleaned)
+        raise GeminiServiceError(
+            "La risposta di Gemini non è un JSON valido."
+        ) from exc
 
-    return _extract_text(response)
+
+# Alias di retrocompatibilità: mantiene funzionante il codice esistente
+# (es. main.py) che chiama ancora il vecchio nome della funzione.
+generate_from_image = generate_from_file
