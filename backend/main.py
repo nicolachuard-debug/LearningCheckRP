@@ -211,4 +211,20 @@ def evaluate(req: EvaluateRequest):
             correct_answer=req.correctAnswer,
             user_answer=req.userAnswer,
         )
-        raw_result = generate_text(prompt,
+        raw_result = generate_text(prompt, req.model)
+        parsed = _extract_json(raw_result)
+        return parsed
+ 
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="Risposta del modello non in formato JSON valido")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+ 
+ 
+@app.get("/")
+def root():
+    return {
+        "message": "Backend API is running",
+        "health": "/health",
+        "docs": "/docs"
+    }
