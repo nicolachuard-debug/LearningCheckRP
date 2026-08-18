@@ -1,1 +1,136 @@
+.uploader-container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
 
+.uploader-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  color: #1a1a2e;
+}
+
+.uploader-title .highlight {
+  color: #6c5ce7;
+  position: relative;
+}
+
+.uploader-subtitle {
+  color: #555;
+  margin-bottom: 2rem;
+  font-size: 1.05rem;
+}
+
+.dropzone {
+  border: 3px dashed #b3a8f0;
+  border-radius: 20px;
+  padding: 2.5rem 1.5rem;
+  background: linear-gradient(135deg, #f5f3ff, #eef0ff);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+}
+
+.dropzone:hover {
+  border-color: #6c5ce7;
+  transform: translateY(-2px);
+}
+
+.dropzone.dragover {
+  border-color: #00cec9;
+  background: #e6fffe;
+}
+
+.dropzone.has-preview {
+  padding: 0.5rem;
+  cursor: default;
+}
+
+.dropzone-placeholder {
+  color: #6c5ce7;
+  font-weight: 600;
+}
+
+.dropzone-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.uploader-error {
+  color: #e74c3c;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.uploader-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+  box-shadow: 0 4px 14px rgba(108, 92, 231, 0.4);
+}
+
+.btn-primary:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(108, 92, 231, 0.5);
+}
+
+.btn-secondary {
+  background: #f1f2f6;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #dfe4ea;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
