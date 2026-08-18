@@ -138,7 +138,15 @@ Restituisci ESCLUSIVAMENTE un JSON valido con questa struttura:
 
 Non aggiungere altro testo oltre al JSON.
 """
-
+# Tipi di file accettati per /analyze
+ALLOWED_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+}
 
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...), model: Optional[str] = Form("gemini-1.5-flash")):
